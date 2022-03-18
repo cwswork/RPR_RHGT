@@ -1,0 +1,34 @@
+import random
+import numpy as np
+import torch
+
+
+# https://blog.csdn.net/weixin_30155853/article/details/112310057
+def truncated_normal(size, mean=0, std=0.9999):
+    (row, col) = size
+    with torch.no_grad():
+        tmp = torch.FloatTensor(row*col*2).normal_()
+        #tmp = tmp.view(2 * row, col)
+        trunc = std * 2
+        valid = (tmp < trunc) & (tmp > -trunc)
+
+        tensor = tmp[valid]
+        idx = random.sample(range(0, len(tensor)), row * col)
+        tensor = tensor[idx].view(row, col)
+        tensor.data.mul_(std).add_(mean)
+        return tensor
+
+
+def L2_distance(x1, x2):
+    """
+    :param vector_a: 向量 a
+    :param vector_b: 向量 b
+    :param target: 结果范围
+    :return: sim
+    """
+    xx = x1 - x2
+    #dis = torch.sqrt(torch.sum(xx * xx, dim=1))  # |x1|
+    dis = torch.sum(xx * xx, dim=1)  # |x1|
+
+    return dis
+

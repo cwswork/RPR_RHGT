@@ -1,0 +1,36 @@
+{
+	"datasetPath": "../../0908datasets/",
+	"output": "../../1212output/",
+	"seed": 72,
+	// dim
+	"e_dim": 300,
+	"n_layers": 1,
+	"n_heads": 4,
+	"embed_type": 1,
+	"l_beta": 0.3, // 0.4, 0.5
+	"gamma_rel": 10.0,  // 0.1、1、1.5 => 1
+
+	// train
+	"optim_type": "Adagrad",
+	"metric": "L1",	 // L1  L2  cosine
+  	"train_epochs": 4000,  //1000,500
+
+	// valid
+	"early_stop": true,
+	"start_valid": 60,
+	"eval_freq": 10,
+	"eval_save_freq": 10,
+	"patience": 20,
+	"patience_minloss": 50, //40
+
+	//
+	"neg_k": 50,
+
+	//
+	"learning_rate": 0.001,
+	"weight_decay": 5e-4,
+	"LeakyReLU_alpha": 0.2,
+	"dropout": 0.1,   // 0.1, 0.2, 0.3
+	"top_k": [1, 3, 5, 10, 50, 100] // [1, 3, 5, 10, 50, 100]
+}
+
