@@ -29,8 +29,7 @@ class configClass():
         #
         self.e_dim = args.e_dim
         self.embed_type = args.embed_type
-        self.dropout = 0
-        #self.attn_heads = 1
+        self.dropout = 0 #args.dropout
 
         #
         self.optim_type = args.optim_type
@@ -42,8 +41,8 @@ class configClass():
 
         #
         self.early_stop = args.early_stop
-        self.start_valid = args.start_valid
-        self.eval_freq = args.eval_freq
+        self.start_valid = args.start_valid  #
+        self.eval_freq = args.eval_freq   #
         self.eval_save_freq = args.eval_save_freq  #  20
 
         #
@@ -55,7 +54,7 @@ class configClass():
         self.weight_decay = args.weight_decay
         self.LeakyReLU_alpha = args.LeakyReLU_alpha
         self.dropout = args.dropout
-        self.embed_type = 1  # 2vectorList.json
+        self.embed_type = 1  # 2 vectorList.json
         #self.learning_rate = 0.001
         self.dropout = args.dropout
         self.gamma_rel = args.gamma_rel
@@ -64,6 +63,7 @@ class configClass():
         self.n_layers = args.n_layers
         self.n_heads = args.n_heads
 
+    #
     def get_param(self):
         self.model_param = 'eps_' + str(self.train_epochs) + \
             '-nk_' + str(self.neg_k) + \
@@ -112,13 +112,12 @@ class Myprint:
 
     def print(self, print_str):
         print(print_str)
-        '''保存log文件'''
+        '''log'''
         with open(self.outfile, 'a', encoding='utf-8') as fw:
             fw.write('{}\n'.format(print_str))
 
 #############################
 class ARGs:
-    ''' 加载配置问卷 args/** .json '''
     def __init__(self, file_path):
         args_dict = loadmyJson(file_path)
         for k, v in args_dict.items():

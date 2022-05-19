@@ -10,7 +10,7 @@ import math
 
 from autil import alignment
 
-# 多头Transformer
+# Mulit-head Transformer
 class Multi_Htrans_Layer(nn.Module):
     def __init__(self, ent_neigh_dict, kg_E, kg_R, config):
         super(Multi_Htrans_Layer, self).__init__()
@@ -20,7 +20,7 @@ class Multi_Htrans_Layer(nn.Module):
 
         self.kg_E = kg_E
         self.rel_adj, self.rel_edge_mat = self.set_Radj(kg_E, kg_R, ent_neigh_dict, config.is_cuda)
-        # 层次比例
+        #
         self.rel_skip_w = nn.Parameter(torch.ones(self.n_layers))
         self.model_layers = nn.ModuleList()
         #self.n_heads = config.n_heads
@@ -36,11 +36,11 @@ class Multi_Htrans_Layer(nn.Module):
             for t, r in trlist:
                 r_head_array[r][h] += 1
                 r_tail_array[r][t] += 1
-        # 头尾节点-关系矩阵：r_head:array[r,h]=1,  r_tail:array[r,t]=1
+        # r_head:array[r,h]=1,  r_tail:array[r,t]=1
         r_head = torch.FloatTensor(r_head_array)
         r_tail = torch.FloatTensor(r_tail_array)
 
-        # 辅助信息
+        #
         r_head_sum = torch.unsqueeze(torch.sum(r_head, dim=-1), -1)  # (R,E)
         r_tail_sum = torch.unsqueeze(torch.sum(r_tail, dim=-1), -1)  # (R,E)
         r_head_sum = torch.where(r_head_sum == 0, torch.tensor(0.), 1. / r_head_sum)  # Instead of countdown
@@ -54,7 +54,6 @@ class Multi_Htrans_Layer(nn.Module):
 
         rel_adj = [r_head, r_head_sum, r_tail, r_tail_sum]
 
-        ##
         edge_index_ht = []
         edge_type_r = []
         for h in range(self.kg_E):
@@ -62,7 +61,7 @@ class Multi_Htrans_Layer(nn.Module):
                 edge_index_ht.append((h, t))  # [target, source]
                 edge_type_r.append(r)
         edge_index_ht = torch.LongTensor(edge_index_ht).t()  # [2, edge_len]
-        edge_type_r = torch.LongTensor(edge_type_r)  # 浮点数
+        edge_type_r = torch.LongTensor(edge_type_r)  #
 
         if is_cuda:
             edge_index_ht = edge_index_ht.cuda(self.device)
@@ -72,7 +71,7 @@ class Multi_Htrans_Layer(nn.Module):
 
 
     def forward(self, ent_name, ent_embed_in):
-        ent_out = ent_name #ent_embed_in
+        ent_out = ent_name
         for l in range(self.n_layers):
             if len(self.model_layers) == 1:
                 ent_out_head = self.model_layers[0](ent_out, self.rel_adj, self.rel_edge_mat)
@@ -89,10 +88,8 @@ class Multi_Htrans_Layer(nn.Module):
             '''
             alpha = torch.sigmoid(self.rel_skip_w[l])
             ent_out = ent_out_head * alpha + ent_embed_in * (1 - alpha)
-            #ent_out = F.normalize(ent_out, p=1, dim=-1)
 
-
-        return ent_out, self.rel_skip_w.detach().tolist() #+ [alpha.detach().tolist()]
+        return ent_out, self.rel_skip_w.detach().tolist()
 
     # add a highway layer
     def highway__(self, e_layer1, e_layer2):
@@ -105,16 +102,16 @@ class Multi_Htrans_Layer(nn.Module):
 
 class Htrans_Layer(MessagePassing):
     def __init__(self, kg_E, kg_R, config, **kwargs):
-        super(Htrans_Layer, self).__init__(node_dim=0, aggr='add', **kwargs) #add， mean, max。
+        super(Htrans_Layer, self).__init__(node_dim=0, aggr='add', **kwargs) # add, mean, max
 
         # Super Parameter
         self.relu = nn.ReLU(inplace=True) # self.relu -> F.gelu
         self.dropout = nn.Dropout(config.dropout)
-        self.leakyrelu = nn.LeakyReLU(config.LeakyReLU_alpha)  # LeakyReLU_alpha: leakyrelu
+        self.leakyrelu = nn.LeakyReLU(config.LeakyReLU_alpha)
 
         # Relation
         self.kg_R = kg_R
-        self.in_dim = 300 # config.e_dim #
+        self.in_dim = 300
         self.out_dim = config.e_dim
         self.dk_dim = self.out_dim // config.n_heads
         self.r_dim = self.dk_dim
@@ -126,8 +123,9 @@ class Htrans_Layer(MessagePassing):
         self.out_linear = nn.Linear(self.dk_dim*3, self.dk_dim)
 
         # relation
-        self.attr_r = nn.Parameter(torch.ones(self.dk_dim*2, 1))
+        self.attr_r = nn.Parameter(torch.ones(self.dk_dim*2, 1))  # relation
 
+        # gatmodel
         self.relation_Left = nn.Parameter(torch.zeros(size=(self.in_dim, self.r_dim))) # W_r
         self.relation_Right = nn.Parameter(torch.zeros(size=(self.in_dim, self.r_dim)))
 
@@ -145,6 +143,7 @@ class Htrans_Layer(MessagePassing):
         return ent_embed_out
 
 
+    # add relation layer
     def get_rlayer(self, ent_embed, rel_adj_list):
         [r_head, r_head_sum, r_tail, r_tail_sum] = rel_adj_list
         L_e_inlayer = torch.mm(ent_embed, self.relation_Left)
@@ -158,39 +157,35 @@ class Htrans_Layer(MessagePassing):
         r_embed = torch.cat([L_r_embed, R_r_embed], dim=-1)  # (r,600)
         r_embed = self.relu(r_embed)
 
-        return r_embed
+        return r_embed  # shape=# (R,2*d)
 
 
     def message(self, edge_index_i, ent_embed_in_i, ent_embed_in_j, edge_type_r, rel_embed):
-        '''
-            j: source, i: target; i <- j
-            ent_embed： i,j
-        '''
         ### Step 1: Heterogeneous Mutual Attention
         # k_linears_head(s), q_linears_head(t)  v_linear_head(s)
         k_mat = self.k_linear_head(ent_embed_in_j) # [T, d]
         q_mat = self.q_linear_head(ent_embed_in_i)
 
         # K(s)W(r) = K(h)*rel_mat(r)
-        kq_mat = torch.cat([k_mat, q_mat], dim=-1) #  [T, 2d]
-        r_mat = rel_embed[edge_type_r]  # [R, 2d] -> [T, 2d]
-        ent_att = kq_mat * r_mat  # [T, 2d]
+        kq_mat = torch.cat([k_mat, q_mat], dim=-1)
+        r_mat = rel_embed[edge_type_r]
+        ent_att = kq_mat * r_mat
         # (K(s)//Q(t)) . R(r) * attr
         ent_att = torch.matmul(ent_att, self.attr_r) / self.sqrt_dk  # [T, 2d] * [2d, 1] -> [T, 1]
         ent_att = -self.leakyrelu(ent_att)
 
         # Step 2: Heterogeneous Message Passing
-        v_mat = self.v_linear_head(ent_embed_in_j)  # -> [T, d]
-        ent_msg = torch.cat([v_mat, r_mat], dim=-1)  # -> [T, 3d]
+        v_mat = self.v_linear_head(ent_embed_in_j)
+        ent_msg = torch.cat([v_mat, r_mat], dim=-1)
 
         # Step 3: # Attention(h,r,t) * Message(h,r,t)
         '''
             Softmax based on target node's id (edge_index_i). Store attention value in self.att for later visualization.
         '''
         ent_att = softmax(ent_att, edge_index_i)  # [T, 1]
-        aggr_out = ent_att * ent_msg  # -> [T,1] . [T, 3d]
+        aggr_out = ent_att * ent_msg
         del ent_msg, ent_att
-        return aggr_out # [T, 3d]
+        return aggr_out
 
 
     def update(self, aggr_out, ent_embed_in):
@@ -198,8 +193,8 @@ class Htrans_Layer(MessagePassing):
             Step 3: Target-specific Aggregation
             x = W[node_type] * gelu(Agg(x)) + x
         '''
-        aggr_out = self.relu(aggr_out) #[E, 2d]
-        trans_out = self.dropout(self.out_linear(aggr_out)) # [E, 3d] -> [E, d]
+        aggr_out = self.relu(aggr_out)
+        trans_out = self.dropout(self.out_linear(aggr_out))
 
         return trans_out
 

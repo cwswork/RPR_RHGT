@@ -42,19 +42,18 @@ class load_KGs_data(object):
         self.valid_links = valid_links_id
         self.test_links = test_links_id
 
-        #
         print('out_temp:', myconfig.out_temp)
-        # ent_neigh_dict, {h:(t, r)}
+        # rel
         self.pre_relation(myconfig)
         # path
-        self.pre_path(myconfig)  # pre_path2
+        self.pre_path(myconfig)
 
 
     def pre_relation(self, myconfig):
         myconfig.myprint("\n=== pre_relation ==")
         ent_neigh_dict = dict()
 
-        # 加自连接
+        # self
         rel_self = self.kg_R
         self.kg_R += 1
         for eid in range(self.kg_E):
@@ -73,18 +72,21 @@ class load_KGs_data(object):
 
     def pre_path(self, myconfig):
         myconfig.myprint("\n=== pre_path ==")
+        # path_neigh_dict: Path and its associated head and tail entities
         path_neigh_dict = dict()
         with open(myconfig.datasetPath + 'path_neigh_dict', 'r', encoding='utf-8') as fr:
             for line in fr:
                 entid, rtlist = eval(line[:-1])
                 path_neigh_dict[entid] = rtlist
 
+        # rpath_sort_dict: Paths and their frequency numbers
         pathid2rr = dict()
         with open(myconfig.datasetPath + 'rpath_sort_dict', 'r', encoding='utf-8') as fr:
             for line in fr:
                 rpath, pathid = eval(line[:-1])
                 pathid2rr[pathid] = rpath
 
+        # 2、path_pair_dict
         path_len = len(pathid2rr)
         path_pair_dict, temp_path_list, temp_notpath_list = pre_relScore.get_align_path(self.ename_embed, self.train_links, path_neigh_dict,
                                                                                 self.kg_E, path_len)
@@ -92,6 +94,7 @@ class load_KGs_data(object):
         fileUtil.save_list2txt(myconfig.out_temp + 'temp_path_list.txt', temp_path_list)
         fileUtil.save_list2txt(myconfig.out_temp + 'temp_notpath_list.txt', temp_notpath_list)
 
+        # 5、pathid
         kg1_id2rel = fileUtil.load_ids2dict(myconfig.datasetPath + 'kg1_rel_dict', read_kv='kv')  # name:id
         kg2_id2rel = fileUtil.load_ids2dict(myconfig.datasetPath + 'kg2_rel_dict', read_kv='kv')
         kg1_id2rel.update(kg2_id2rel)
@@ -109,6 +112,7 @@ class load_KGs_data(object):
 
         path_triple_num = 0
         path_triple_old_num = 0
+        # self
         path_self_id = path_newid + 1
         for h, trlist in path_neigh_dict.items():
             path_triple_old_num += len(trlist)
@@ -124,5 +128,3 @@ class load_KGs_data(object):
         myconfig.myprint("Number of path_newid:" + str(self.kg_path))
         myconfig.myprint("Number of all path_triple:" + str(path_triple_old_num))
         myconfig.myprint("Number of path_triple by aligned:" + str(path_triple_num))
-
-

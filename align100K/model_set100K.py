@@ -1,6 +1,7 @@
 import os
 import sys
 import time
+import numpy as np
 import torch
 import torch.nn as nn
 
@@ -25,7 +26,6 @@ class align_set100K():
             fileUtil.savepickle(kgsdata_file, kgs_data)
         self.myprint('====Finish Load kgs_data====' + kgsdata_file)
 
-
         ## Model and optimizer ######################
         self.align_model = Align_Htrans(kgs_data, myconfig)
         if myconfig.is_cuda:
@@ -33,7 +33,7 @@ class align_set100K():
         ### optimizer
         if myconfig.optim_type == 'Adagrad':
             self.optimizer = torch.optim.Adam(self.align_model.model_params, lr=myconfig.learning_rate,
-                            weight_decay=myconfig.weight_decay)  # 权重衰减（参数L2损失）weight_decay =5e-4
+                            weight_decay=myconfig.weight_decay)  # weight_decay =5e-4
         else:
             self.optimizer = torch.optim.SGD(self.align_model.model_params, lr=myconfig.learning_rate,
                             weight_decay=myconfig.weight_decay)
@@ -55,7 +55,7 @@ class align_set100K():
                 if self.myconfig.early_stop and break_re:
                     break
 
-        #
+        # printing
         self.save_model(epochs_i, 'last')  # last_epochs
         self.myprint("Optimization Finished!")
         self.myprint('Last epoch-{:04d}:'.format(epochs_i))
@@ -64,7 +64,7 @@ class align_set100K():
         # Last Test
         self.runTest(epochs_i=epochs_i, is_save=True)  # Testing
 
-        # Best Test, load model
+        # Best Test
         self.myprint('Best epoch-{:04d}:'.format(self.best_epochs))
         if epochs_i != self.best_epochs:
             best_savefile = '{}-epochs-{}-{}.pkl'.format(self.best_mode_pkl_title, self.best_epochs, 'best')
@@ -74,14 +74,12 @@ class align_set100K():
         self.myprint("Total time elapsed: {:.4f}s".format(time.time() - t_begin))
 
 
-    ## 运行每轮训练
     def runTrain(self, epochs_i):
         t_epoch = time.time()
-
         # Model trainning
         # Forward pass
         self.align_model.train()
-        self.optimizer.zero_grad()  # 梯度清零
+        self.optimizer.zero_grad()
 
         # model action  4 loss
         skip_w = self.align_model.forward()
@@ -91,7 +89,7 @@ class align_set100K():
         train_loss.backward()
         loss_float = train_loss.data.item()
         # torch.nn.utils.clip_grad_norm_(model.parameters(), args.clip)
-        self.optimizer.step()  #
+        self.optimizer.step()
         self.myprint('Epoch-{:04d}: Train_loss-{:.8f}, cost time-{:.4f}s'.format(
             epochs_i, loss_float, time.time() - t_epoch))
 
@@ -104,10 +102,8 @@ class align_set100K():
 
         return hits1_L
 
-
     def runTest(self, epochs_i, is_save=False):
         break_re = False
-        # 1 init
         with torch.no_grad():
             # 2 Forward pass
             self.align_model.eval()
@@ -130,9 +126,9 @@ class align_set100K():
             self.best_hits1 = hits1_L
             self.best_epochs = epochs_i
             self.bad_counter = 0
-            self.save_model(epochs_i, 'best')
+            self.save_model(epochs_i, 'best')  # save model
             self.myprint('==Test==Epoch-{:04d}, better result, best_hits1:{:.4f}..'.format(epochs_i, self.best_hits1))
-            ### save file
+            ###
             with open(self.best_mode_pkl_title + '_Result.txt', "a") as ff:
                 ff.write(testRe_print)
         else:
@@ -143,7 +139,6 @@ class align_set100K():
                 self.myprint('==bad_counter, stop training.')
                 break_re = True
 
-            ###############
         if is_save:  # only reTest
             self.myprint('++++++++ Save TEST Result ++++++++')
             save_file = '{}_{}'.format(self.best_mode_pkl_title, epochs_i)
@@ -154,9 +149,8 @@ class align_set100K():
 
 
     def save_model(self, better_epochs_i, epochs_name):  # best-epochs
-        # save model to file ：
+        # save model to file
         model_savefile = '{}-epochs-{}-{}.pkl'.format(self.best_mode_pkl_title, better_epochs_i, epochs_name)
-        #
         model_state = dict()
         model_state['align_layer'] = self.align_model.state_dict()
         torch.save(model_state, model_savefile)
@@ -165,7 +159,6 @@ class align_set100K():
     def load_model(self, model_savefile, epoch_i):  # best-epochs
         # load model to file
         self.myprint('\nLoading file: {} - {}th epoch'.format(model_savefile, epoch_i))
-        #
         if self.myconfig.is_cuda:
             checkpoint = torch.load(model_savefile)
         else:

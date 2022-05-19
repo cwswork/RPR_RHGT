@@ -51,27 +51,3 @@ def gen_neg_each(ent_embed, left_ents, metric, neg_k):
     return neg  # (n*k,)
 
 
-################################
-def link_inset(list1):
-    list2 = []
-    for i in list1:
-        if i not in list2:
-            list2.append(i)
-    return list2
-
-
-############################################
-
-def noin_fun(test_links, test_candidates):
-    noin_test_candidate_num = 0
-    test_links_new = []
-    firstin = 0
-    for e1, e2 in test_links:
-        if e2 == test_candidates[e1][0]:
-            firstin += 1
-        if e2 not in test_candidates[e1]:
-            noin_test_candidate_num += 1
-            #print(e1, e2)
-        else:
-            test_links_new.append((e1, e2))
-    return noin_test_candidate_num, firstin

@@ -1,5 +1,3 @@
-import math
-
 import numpy as np
 import torch
 import torch.nn as nn
@@ -29,15 +27,15 @@ class Align_Htrans(nn.Module):
         self.kg_E = kgs_data.kg_E
         self.kg_R = kgs_data.kg_R
         self.e_dim = config.e_dim
-        # name embedding ##############
+        # entityname embed ##############
         self.kg_name_embed = kgs_data.ename_embed
         self.kg_name_model = nn.Linear(300, self.e_dim)
 
-
+        # Multi_Htrans_Layer
         self.model_rels = Multi_Htrans_Layer(kgs_data.ent_neigh_dict, kgs_data.kg_E, kgs_data.kg_R, config)
         if 'path' in config.model_type:
             self.isPath = True
-            self.myprint('new kg_path:' + str(kgs_data.kg_path)) # self
+            self.myprint('new kg_path:' + str(kgs_data.kg_path))
             self.model_paths = Multi_Htrans_Layer(kgs_data.path_neigh_dict, kgs_data.kg_E, kgs_data.kg_path, config)
         else:
             self.isPath = False
@@ -48,11 +46,11 @@ class Align_Htrans(nn.Module):
             if self.isPath:
                 self.model_paths = self.model_paths.cuda(self.device)
 
-        ##  ##############
+        ## Parameters ##############
         params = list(self.parameters())
         self.model_params = [{'params': params}]
         params_list = [param for param in self.state_dict()]
-        self.myprint('model中所有参数名:{}\n{}'.format(str(len(params_list)), params_list.__str__()))
+        self.myprint('model Parameters:{}\n{}'.format(str(len(params_list)), params_list.__str__()))
 
         ########################
         self.reNeg = False
@@ -65,11 +63,6 @@ class Align_Htrans(nn.Module):
         else:
             self.valid_links = []
 
-        self.left_non_train, self.right_non_train = [], []
-        for e1, e2 in self.notrain_links_list:
-            self.left_non_train.append(e1)
-            self.right_non_train.append(e2)
-
 
     def resetPath(self, path_neigh_dict, kg_path):
         add_rid = kg_path
@@ -81,11 +74,12 @@ class Align_Htrans(nn.Module):
 
     # 2 rel_gat
     def forward(self):
-        ###1 model_name
+        #1 model_name
         end_embed_in = self.kg_name_model(self.kg_name_embed)
-        ### 2 rel model
+
+        # 2 rel model
         rel_embed, skip_w = self.model_rels(self.kg_name_embed, end_embed_in)
-        ###3 path model
+        #3 path model
         if self.isPath:
             path_embed, p_skip_w = self.model_paths(self.kg_name_embed, end_embed_in)
             skip_w_all = skip_w + p_skip_w
@@ -98,21 +92,9 @@ class Align_Htrans(nn.Module):
 
         return str(skip_w_all)
 
-    def accTest(self, tt_links_tensor, tt_links):
-
-        Left_vec = self.rel_embed[tt_links_tensor[:, 0], :]
-        Right_vec = self.rel_embed[tt_links_tensor[:, 1], :]
-        Left_re = alignment.get_hits(Left_vec, Right_vec, tt_links, self.top_k, self.metric, LeftRight='Left')
-        print('Rel:', Left_re[1])
-
-        Left_vec = self.path_embed[tt_links_tensor[:, 0], :]
-        Right_vec = self.path_embed[tt_links_tensor[:, 1], :]
-        Left_re = alignment.get_hits(Left_vec, Right_vec, tt_links, self.top_k, self.metric, LeftRight='Left')
-        print('Rel:', Left_re[1])
-
 
     def regen_neg(self):
-        # neg gen
+        # 负样本采样——训练对（正样本和负样本）
         self.train_neg_pairs_rel = model_util.gen_neg(self.rel_embed, self.train_links, self.metric, self.neg_k)
         if self.isPath:
             self.train_neg_pairs_path = model_util.gen_neg(self.path_embed, self.train_links, self.metric, self.neg_k)
@@ -132,14 +114,14 @@ class Align_Htrans(nn.Module):
 
         self.reNeg = False
 
-    ## loss function
+    ## 损失函数
     def get_loss(self, epochs_i, link_type=1):
-        # neg
+        # 负采样
         if (self.reNeg or epochs_i % 20 == 0) and link_type==1:
             self.regen_neg()
 
         if link_type == 1:
-            tt_neg_rel = self.train_neg_pairs_rel
+            tt_neg_rel = self.train_neg_pairs_rel  # (pe1, pe2, neg_indexs1[i], neg_indexs2[i])
             if self.isPath:
                 tt_neg_path = self.train_neg_pairs_path
         else:
@@ -156,15 +138,18 @@ class Align_Htrans(nn.Module):
 
     def get_loss_each(self, e_embed, tt_neg_pairs):
         # loss
+        # Positive sample
         pe1_embed = e_embed[tt_neg_pairs[:, 0]]
         pe2_embed = e_embed[tt_neg_pairs[:, 1]]
         A = alignment.mypair_distance_min(pe1_embed, pe2_embed, distance_type=self.metric)
         D = (A + self.gamma_rel)  # .view(t, 1)
 
+        # Negative sample  # p1
         ne1_embed = e_embed[tt_neg_pairs[:, 2]]
         B = alignment.mypair_distance_min(pe1_embed, ne1_embed, distance_type=self.metric)
         loss1 = self.relu(D - B)  # (t, 50).view(t, -1)
 
+        # Negative sample  # p2
         ne2_embed = e_embed[tt_neg_pairs[:, 3]]
         C = alignment.mypair_distance_min(pe2_embed, ne2_embed, distance_type=self.metric)
         loss2 = self.relu(D - C)
@@ -173,7 +158,6 @@ class Align_Htrans(nn.Module):
         return loss
 
 
-    ## accuracy
     def accuracy(self, link_type=1):
         with torch.no_grad():
             if link_type == 1:
@@ -192,13 +176,15 @@ class Align_Htrans(nn.Module):
                 Left_vec = self.rel_embed[tt_links_tensor[:, 0], :]
                 Right_vec = self.rel_embed[tt_links_tensor[:, 1], :]
 
-            # alignment
-            Left_re = alignment.get_hits(Left_vec, Right_vec, tt_links, self.top_k, self.metric, LeftRight='Left')
+            # get_hits -> get_hits_simple
+            Left_re, align_time = alignment.get_hits_simple(Left_vec, Right_vec, tt_links, self.top_k, self.metric, LeftRight='Left')
             # From Right
             if link_type == 3:
-                Right_re = alignment.get_hits(Right_vec, Left_vec, tt_links[:, [1, 0]], self.top_k, self.metric, LeftRight='Right')
+                Right_re, align_time_R = alignment.get_hits_simple(Right_vec, Left_vec, tt_links[:, [1, 0]], self.top_k, self.metric, LeftRight='Right')
             else:
                 Right_re = None
 
-        return Left_re, Right_re
+        return Left_re, Right_re, align_time
+
+############################
 

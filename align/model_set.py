@@ -2,7 +2,6 @@ import os
 import sys
 import time
 import numpy as np
-from tensorboardX import SummaryWriter
 import torch
 import torch.nn as nn
 
@@ -34,10 +33,11 @@ class align_set():
         ### optimizer
         if myconfig.optim_type == 'Adagrad':
             self.optimizer = torch.optim.Adam(self.align_model.model_params, lr=myconfig.learning_rate,
-                            weight_decay=myconfig.weight_decay)  # 权重衰减（参数L2损失）weight_decay =5e-4
+                            weight_decay=myconfig.weight_decay)  # weight_decay =5e-4
         else:
             self.optimizer = torch.optim.SGD(self.align_model.model_params, lr=myconfig.learning_rate,
                             weight_decay=myconfig.weight_decay)
+        self.train_time, self.train, self.valid, self.test = 0,0,0,0
 
     ## model train
     def model_run(self, beg_epochs=0):
@@ -57,7 +57,8 @@ class align_set():
                 if self.myconfig.early_stop and break_re:
                     break
 
-        self.save_model(epochs_i, 'last')  # last_epochs
+        # 输出相关数据
+        self.save_model(epochs_i, 'last')  # save last_epochs
         self.myprint("Optimization Finished!")
         self.myprint('Last epoch-{:04d}:'.format(epochs_i))
         self.myprint('Best epoch-{:04d}:'.format(self.best_epochs))
@@ -73,10 +74,13 @@ class align_set():
             self.myprint('\nLoading file: {} - {}th epoch'.format(best_savefile, self.best_epochs))
             self.reRunTest(best_savefile, self.best_epochs)
         self.myprint("Total time elapsed: {:.4f}s".format(time.time() - t_begin))
+
         self.myprint('model arguments:' + self.myconfig.get_param())
 
+    ## Epoch Train
     def runTrain(self, epochs_i):
         t_epoch = time.time()
+
         # Model trainning
         # Forward pass
         self.align_model.train()
@@ -87,21 +91,32 @@ class align_set():
         train_loss = self.align_model.get_loss(epochs_i, link_type=1)
         # Backward and optimize
         train_loss.backward()
+
         self.optimizer.step()
         self.myprint('Epoch-{:04d}: Train_loss-{:.8f}, cost time-{:.4f}s'.format(
             epochs_i, train_loss.data.item(), time.time() - t_epoch))
 
+        # Run time
+        # self.train_time += time.time() - t_epoch
+        # if epochs_i>9 and epochs_i%10==0:
+        #     self.myprint('timeTest== Train_time:{:.6f}s, epochs:{}'.format(self.train_time / (epochs_i+1), epochs_i))
+
         # Accuracy
         if epochs_i % 5 == 0:
-            [hits1_L, result_str_L, Hits_list_L], _ = self.align_model.accuracy(link_type=1)
-            self.myprint('Train==' + result_str_L + ';skip_w:'+ skip_w)
+            [hits1_L, result_str_L, Hits_list_L], _, align_time = self.align_model.accuracy(link_type=1)
+            # 计算运行时间
+            self.train += align_time
+            if epochs_i>9 and epochs_i%10==0:
+                self.myprint('timeTest== Train:{:.6f}s, epochs:{}'.format(self.train / (epochs_i+1), epochs_i))
         else:
             hits1_L = 0
         return hits1_L
 
+    ## Epoch Valid
     def runValid(self, epochs_i):
         t_epoch = time.time()
         break_re = False
+        #
         with torch.no_grad():
             # Forward pass
             self.align_model.eval()
@@ -110,12 +125,16 @@ class align_set():
             # loss
             valid_loss = self.align_model.get_loss(epochs_i, link_type=2)
             loss_float = valid_loss.data.item()
-            [hits1_L, result_str_L, Hits_list_L], _ = self.align_model.accuracy(link_type=2)
+            [hits1_L, result_str_L, Hits_list_L], _, align_time = self.align_model.accuracy(link_type=2)
+            # Run time
+            # self.valid += align_time
+            # if epochs_i>9 and epochs_i%10==0:
+            #     self.myprint('timeTest== Valid:{:.6f}s, epochs:{}'.format(self.valid / (epochs_i+1), epochs_i))
 
-            #if loss_alpha == None:
+
             self.myprint('Epoch-{:04d}: Valid_loss-{:.8f}, cost time-{:.4f}s'.format(
                 epochs_i, valid_loss.data.item(), time.time() - t_epoch))
-            self.myprint('==Valid==' + result_str_L)
+            self.myprint('==Valid==' + result_str_L)  # 准确率等
 
         # ********************no early stop********************************************
         # save best model in valid
@@ -133,7 +152,7 @@ class align_set():
             self.bad_counter += 1
             self.myprint('==bad_counter++:' + str(self.bad_counter))
             # bad model, stop train
-            if self.bad_counter == self.myconfig.patience:
+            if self.bad_counter == self.myconfig.patience:  # patience=20
                 self.myprint('==bad_counter, stop training.')
                 break_re = True
 
@@ -152,6 +171,7 @@ class align_set():
         return break_re, hits1_L
 
 
+    ## Test
     def runTest(self, epochs_i, is_save=False):
 
         with torch.no_grad():
@@ -161,7 +181,12 @@ class align_set():
             self.align_model.forward()
 
             # 4 Accuracy
-            Left_re, Right_re = self.align_model.accuracy(link_type=3)
+            Left_re, Right_re, align_time = self.align_model.accuracy(link_type=3)
+            # Run time
+            # self.test += align_time
+            # if epochs_i>9 and epochs_i%10==0:
+            #     self.myprint('timeTest== Test:{:.6f}s, epochs:{}'.format(self.test / (epochs_i+1), epochs_i))
+
             [hits1_L, result_str_L, Hits_list_L] = Left_re
             result_str_L = "==From left:" + result_str_L
             [hits1_R, result_str_R, Hits_list_R] = Right_re
@@ -171,13 +196,7 @@ class align_set():
             # self.myprint('++++++++TEST Result++++++++')
             testRe_print = '++TEST Result++Epochs-{:04d}: \n{}\n{}'.format(epochs_i, result_str_L, result_str_R)
             self.myprint(testRe_print)
-
-        ### Test Del
-        if hits1_L >= self.best_test_hits1:
-            self.best_test_epochs = epochs_i
-            self.best_test_hits1 = hits1_L
-            with open(self.best_mode_pkl_title + '_Result.txt', "a") as ff:
-                ff.write(testRe_print)
+            # self.board_writer.add_scalar('Test_hits1', hits_mr_mrr[0][0], epochs_i)
 
         ###############
         if is_save:  # only reTest
@@ -188,7 +207,9 @@ class align_set():
 
 
     def save_model(self, better_epochs_i, epochs_name):  # best-epochs
+        # save model to file
         model_savefile = '{}-epochs-{}-{}.pkl'.format(self.best_mode_pkl_title, better_epochs_i, epochs_name)
+        #
         model_state = dict()
         model_state['align_layer'] = self.align_model.state_dict()
         model_state['myconfig'] = self.myconfig
@@ -198,6 +219,7 @@ class align_set():
     def reRunTrain(self, model_savefile, beg_epochs, is_cuda=False):  # best-epochs
         # load model to file
         self.myprint('\nLoading file: {} - {}th epoch'.format(model_savefile, beg_epochs))
+        #
         if is_cuda:
             checkpoint = torch.load(model_savefile)
         else:
@@ -208,6 +230,7 @@ class align_set():
 
 
     def reRunTest(self, model_savefile, epoch_i):  # best-epochs
+        # load model to file
         if self.myconfig.is_cuda:
             checkpoint = torch.load(model_savefile)
         else:

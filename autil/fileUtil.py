@@ -1,10 +1,12 @@
 import pickle
 import numpy as np
 
+
 def savepickle(path, data):
     f = open(path, 'wb')
     pickle.dump(data, f)
     f.close()
+
 
 def loadpickle(path):
     with open(path, "rb+") as f:
@@ -18,7 +20,6 @@ def printNumpy(outfile, a):
             fw.write('{}\n'.format(ll.__str__()))
 
 #########################################################
-## save ###
 def save_dict2txt(outfile, out_dict, save_kv='kv'):
     '''entity，relation，id'''
     with open(outfile, 'w', encoding='utf-8') as fw:
@@ -31,7 +32,7 @@ def save_dict2txt(outfile, out_dict, save_kv='kv'):
 
 
 def save_list2txt(outfile, triples_list):
-    '''triples id '''
+    '''triplesid'''
     if len(triples_list)==0:
         return
 
@@ -48,7 +49,6 @@ def save_list2txt(outfile, triples_list):
 
 
 def save_triple2txt(outfile, triples_list):
-    '''triplesid, link id  '''
     with open(outfile, 'w', encoding='utf-8') as fw:
         if len(triples_list[0]) == 3:
             for (h, r, t) in triples_list:
@@ -61,10 +61,7 @@ def save_triple2txt(outfile, triples_list):
 
 
 #########################################################
-#### load ###
 def get_links2ids(links_file, kg1_ent2id_dict, kg2_ent2id_dict, isID=False):
-    '''
-    '''
     if isID:
         ent_links = get_links_ids(links_file)
     else:
@@ -81,8 +78,6 @@ def get_links2ids(links_file, kg1_ent2id_dict, kg2_ent2id_dict, isID=False):
     return links_ids_list
 
 def get_links_ids(links_file):
-    '''
-    '''
     print("load_list:", links_file)
     links_ids_list = []
     with open(links_file, encoding='utf-8', mode='r') as f:
@@ -147,6 +142,7 @@ def load_ids2list(file_path):
 
 
 def load_ids2dict(file, read_kv='kv', sep='\t'):
+    #ent_ids_1、ent_ids_2
     print('loading ids_dict file ' + file)
     kg_ent2id_dict = dict()
     with open(file, encoding='utf-8') as f:
@@ -163,6 +159,7 @@ def load_ids2dict(file, read_kv='kv', sep='\t'):
 
 
 def load_ids(file):
+    # ent_ids_1、ent_ids_2
     print('loading a ent_ids...' + file)
     with open(file, encoding='utf-8') as f:
         kg_ent2id = []
@@ -188,8 +185,7 @@ def load_triples_id(file_path):
     return new_list
 
 
-# 读取文件
-## 三元组 ###########################################
+## triples ###########################################
 def read_relation_triples(file_path):
     '''
     read relation_triples
@@ -287,7 +283,6 @@ def relation_triple2ids(relation_triples, ent_ids_dict, rel_ids_dict):
 
 
 def attribute_triple2ids(uris, ent_ids, attr_ids, value_ids):
-    '''  '''
     id_uris = list()
     for u1, u2, u3 in uris:
         if u2 not in attr_ids:
