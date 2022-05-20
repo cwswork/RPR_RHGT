@@ -1,6 +1,6 @@
 # RPR-RHGT
 
-Source code and datasets for 2022 paper: 
+Source code and datasets for IJCAI 2022 paper: 
 [***Entity Alignment with Reliable Path Reasoning and Relation-aware Heterogeneous Graph Transformer***]
 
 ## Datasets
