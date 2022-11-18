@@ -53,4 +53,5 @@ python3 align100K/exc_plan100K.py
 If you use this model or code, please cite it as follows:
 
 *Weishan Cai, Wenjun Ma, Jieyu Zhan, and Yuncheng Jiang*, 
-“Entity Alignment with Reliable Path Reasoning and Relation-aware Heterogeneous Graph Transformer”. In [Proceedings of the 31st International Joint Conference on Artificial Intelligence and the 25th European Conference on Artificial Intelligence (IJCAI-ECAI 2022)](https://ijcai-22.org/main-track-accepted-papers/)
+“Entity Alignment with Reliable Path Reasoning and Relation-aware Heterogeneous Graph Transformer”. In [Proceedings of the 31st International Joint Conference on Artificial Intelligence and the 25th European Conference on Artificial Intelligence (IJCAI-ECAI 2022)],3:1930-1937.(https://www.ijcai.org/proceedings/2022/268)
+
